@@ -1,0 +1,199 @@
+<!DOCTYPE html>
+<html lang="hu">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <!-- PWA meta adatok -->
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-title" content="Flashcards">
+  <meta name="theme-color" content="#0f62fe">
+  <link rel="manifest" href="manifest.json">
+  <link rel="apple-touch-icon" href="icon.png">
+  
+  <title>Flashcards</title>
+  
+  <style>
+    /* Alap reset */
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: 'Open Sans', sans-serif; background: #f0f0f0; color: #333; line-height: 1.6; }
+    .container { width: 100%; max-width: 500px; margin: 2rem auto; padding: 1rem; }
+    .card {
+      background: #fff; padding: 1.5rem; 
+      box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+      border-radius: 5px; margin: 1rem 0;
+    }
+    h2 { text-align: center; margin-bottom: 1.5rem; }
+    input[type="text"],
+    input[type="email"],
+    input[type="password"] {
+      width: 100%; padding: 0.75rem; margin-bottom: 1rem;
+      border: 1px solid #ccc; border-radius: 4px;
+    }
+    button {
+      width: 100%; padding: 0.75rem;
+      background-color: #0f62fe; color: #fff;
+      border: none; border-radius: 4px;
+      cursor: pointer;
+    }
+    button:hover { background-color: #095cb4; }
+    .link { text-align: center; margin-top: 1rem; }
+    .link a { color: #0f62fe; text-decoration: none; }
+    .link a:hover { text-decoration: underline; }
+
+    /* Flashcard stílus */
+    .flashcard-container { perspective: 1000px; }
+    .flashcard {
+      width: 100%; height: 200px;
+      position: relative; transition: transform 0.8s;
+      transform-style: preserve-3d; cursor: pointer;
+    }
+    .flashcard.flipped { transform: rotateY(180deg); }
+    .flashcard-side {
+      position: absolute; width: 100%; height: 100%;
+      backface-visibility: hidden;
+      display: flex; align-items: center; justify-content: center;
+      padding: 1rem; text-align: center;
+      /* Hosszú szöveg automatikus sortörése, így a szöveg térköztöréssel folytatódik a kártyán belül */
+      word-wrap: break-word; white-space: pre-wrap;
+    }
+    .flashcard-front {
+      background: #fff; border: 1px solid #ccc; border-radius: 5px;
+    }
+    .flashcard-back {
+      background: #e0e0e0; border: 1px solid #ccc; border-radius: 5px;
+      transform: rotateY(180deg);
+    }
+
+    /* Mobil optimalizálás */
+    @media (max-width: 600px) {
+      .container { margin: 1rem; padding: 1rem; }
+    }
+  </style>
+</head>
+<body>
+  <!-- Bejelentkezési nézet -->
+  <div class="container" id="loginView">
+    <h2>Bejelentkezés</h2>
+    <div class="card">
+      <input type="email" id="loginEmail" placeholder="Email cím">
+      <input type="password" id="loginPassword" placeholder="Jelszó">
+      <div>
+        <label><input type="checkbox" id="rememberMe"> Emlékezz rám</label>
+      </div>
+      <button onclick="login()">Bejelentkezés</button>
+      <div class="link">
+         <a href="#" onclick="showForgotPassword()">Elfelejtett jelszó?</a>
+      </div>
+      <div class="link">
+         <span>Még nincs fiókod? <a href="#" onclick="switchToRegister()">Regisztráció</a></span>
+      </div>
+    </div>
+  </div>
+
+  <!-- Regisztrációs nézet -->
+  <div class="container" id="registerView" style="display:none">
+    <h2>Regisztráció</h2>
+    <div class="card">
+      <input type="text" id="fullName" placeholder="Teljes név">
+      <input type="text" id="username" placeholder="Felhasználónév">
+      <input type="email" id="registerEmail" placeholder="Email cím">
+      <input type="password" id="registerPassword" placeholder="Jelszó">
+      <input type="password" id="repeatPassword" placeholder="Jelszó újra">
+      <div>
+        <label><input type="checkbox" id="terms">
+          Elfogadom az Általános Szerződési Feltételeket
+        </label>
+      </div>
+      <button onclick="register()">Regisztráció</button>
+      <div class="link">
+         <span>Már van fiókod? <a href="#" onclick="switchToLogin()">Bejelentkezés</a></span>
+      </div>
+    </div>
+  </div>
+
+  <!-- Flashcards nézet -->
+  <div class="container" id="flashcardsView" style="display:none">
+    <h2>Flashcards</h2>
+    <div class="card flashcard-container">
+       <div class="flashcard" onclick="flipCard(this)">
+         <div class="flashcard-side flashcard-front">
+           Mi volt a Római Birodalom csúcspontja? Ha a szöveg túl hosszú, akkor térköztöréssel folytatódik lejebb, de mindig marad a kártyán belül.
+         </div>
+         <div class="flashcard-side flashcard-back">
+           Augustus és a Pax Romana kialakulása
+         </div>
+       </div>
+    </div>
+    <div class="link">
+      <a href="#" onclick="logout()">Kijelentkezés</a>
+    </div>
+  </div>
+
+  <script>
+    // Navigációs függvények a nézetváltáshoz
+    function switchToRegister() {
+      document.getElementById('loginView').style.display = 'none';
+      document.getElementById('registerView').style.display = 'block';
+    }
+    function switchToLogin() {
+      document.getElementById('registerView').style.display = 'none';
+      document.getElementById('loginView').style.display = 'block';
+    }
+    function login() {
+      // Egyszerű ügyféloldali validáció,
+      // itt AJAX hívás helyett csak a nézetváltás történik
+      if (document.getElementById('loginEmail').value === "" || document.getElementById('loginPassword').value === "") {
+        alert("Kérjük, töltsd ki az összes mezőt!");
+        return;
+      }
+      document.getElementById('loginView').style.display = 'none';
+      document.getElementById('flashcardsView').style.display = 'block';
+    }
+    function register() {
+      if (document.getElementById('fullName').value === "" ||
+          document.getElementById('username').value === "" ||
+          document.getElementById('registerEmail').value === "" ||
+          document.getElementById('registerPassword').value === "" ||
+          document.getElementById('repeatPassword').value === "") {
+        alert("Kérjük, töltsd ki az összes mezőt!");
+        return;
+      }
+      if (document.getElementById('registerPassword').value !== document.getElementById('repeatPassword').value) {
+        alert("A jelszavak nem egyeznek!");
+        return;
+      }
+      if (!document.getElementById('terms').checked) {
+        alert("Elfogadás szükséges az Általános Szerződési Feltételekhez!");
+        return;
+      }
+      document.getElementById('registerView').style.display = 'none';
+      document.getElementById('flashcardsView').style.display = 'block';
+    }
+    function logout() {
+      document.getElementById('flashcardsView').style.display = 'none';
+      document.getElementById('loginView').style.display = 'block';
+    }
+    // Flashcard flip animáció
+    function flipCard(card) {
+      card.classList.toggle('flipped');
+    }
+    function showForgotPassword() {
+      alert('Jelszó visszaállítási funkció nincs implementálva.');
+    }
+
+    // Service Worker regisztráció a PWA működéshez
+    if ('serviceWorker' in navigator) {
+      window.addEventListener('load', function() {
+        navigator.serviceWorker.register('service-worker.js')
+          .then(function(registration) {
+            console.log('ServiceWorker regisztráció sikeres, scope:', registration.scope);
+          })
+          .catch(function(error) {
+            console.log('ServiceWorker regisztráció sikertelen:', error);
+          });
+      });
+    }
+  </script>
+</body>
+</html>
